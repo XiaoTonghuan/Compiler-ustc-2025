@@ -14,5 +14,8 @@ public:
     void inline_all_functions();
 
     // void log();
-    std::set<std::string> outside_func={"getint","getch","getfloat","getarray","getfarray","putint","putch","putarray","putfloat","putfarray","memset_int", "memset_float","_sysy_starttime","_sysy_stoptime"};
+    std::set<std::string> outside_func={"output",
+                                        "outputFloat",
+                                        "input",
+                                        "neg_idx_except"};
 };
