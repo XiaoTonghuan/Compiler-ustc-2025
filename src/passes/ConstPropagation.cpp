@@ -145,11 +145,78 @@ void ConstPropagation::run() {
                     }
                 }
                 // TODO: fold other type of expression
-                throw std::runtime_error("Lab2: 你有一个TODO需要完成！");
+                else if (instr.is_fadd() || instr.is_fsub() || instr.is_fmul() || instr.is_fdiv()) {;
+                    auto value1 = cast_constantfp(instr.get_operand(0));
+                    auto value2 = cast_constantfp(instr.get_operand(1));
+                    if (value1 && value2) {
+                        auto fold_const = folder->compute(instr.get_instr_type(), value1, value2);
+
+                        instr.replace_all_use_with(fold_const);
+                        wait_delete.push_back(&instr);
+                    }
+                } else if (instr.is_si2fp()) {
+                    auto value1 = cast_constantint(instr.get_operand(0));
+                    if (value1) {
+                        auto fold_const = folder->compute(instr.get_instr_type(), value1);
+
+                        instr.replace_all_use_with(fold_const);
+                        wait_delete.push_back(&instr);
+                    }
+                } else if (instr.is_fp2si()) {
+                    auto value1 = cast_constantfp(instr.get_operand(0));
+                    if (value1) {
+                        auto fold_const = folder->compute(instr.get_instr_type(), value1);
+
+                        instr.replace_all_use_with(fold_const);
+                        wait_delete.push_back(&instr);
+                    }
+                } else if (instr.is_cmp()) {
+                    auto value1 = cast_constantint(instr.get_operand(0));
+                    auto value2 = cast_constantint(instr.get_operand(1));
+                    if (value1 && value2) {
+                        auto fold_const = folder->compute(instr.get_instr_type(), value1, value2);
+
+                        instr.replace_all_use_with(fold_const);
+                        wait_delete.push_back(&instr);
+                    }
+                } else if (instr.is_fcmp()) {
+                    auto value1 = cast_constantfp(instr.get_operand(0));
+                    auto value2 = cast_constantfp(instr.get_operand(1));
+                    if (value1 && value2) {
+                        ConstantInt *temp;
+                        auto fold_const = folder->compute(instr.get_instr_type(), value1, value2);
+                        if(fold_const == ConstantFP::get(0, m_)) temp = ConstantInt::get(0, m_);
+                        else temp = ConstantInt::get(1, m_);
+                        instr.replace_all_use_with(temp);
+                        wait_delete.push_back(&instr);
+                    }
+                } else if (instr.is_zext()) {
+                    auto value = cast_constantint(instr.get_operand(0));
+                    if (value) {
+                        // 检查是否是布尔值常量
+                        std::string str = value->print();
+                        if (str.find("true") != std::string::npos || str.find("false") != std::string::npos) {
+                            // 如果是布尔值常量，保留 zext
+                            continue;
+                        }
+                        // 如果是普通整数常量，则可以直接替换
+                        instr.replace_all_use_with(value);
+                        wait_delete.push_back(&instr);
+                    }
+                }
+                else if (instr.is_phi() && instr.get_operands().size() == 4) {
+                    auto value1 = cast_constantint(instr.get_operand(0));
+                    auto value2 = cast_constantint(instr.get_operand(2));
+                    if (value1 && value2) {
+                        if (value1->get_value() == value2->get_value()) {
+                            instr.replace_all_use_with(instr.get_operand(0));
+                        }
+                    }
+                }   
             }
             globalvar_def.clear();
             for (auto instr : wait_delete) {
-                bb.remove_instr(instr);
+                bb.erase_instr(instr);
             }
         }
     }
@@ -158,11 +225,38 @@ void ConstPropagation::run() {
         for (auto &bb : func.get_basic_blocks()) {
             builder->set_insert_point(&bb);
             // TODO: check if conditional branch's condition is constant
-            throw std::runtime_error("Lab2: 你有一个TODO需要完成！");
+            if(bb.get_terminator()->is_br() && bb.get_terminator()->get_operands().size() == 3) {
+                auto cond_br = static_cast<BranchInst*>(bb.get_terminator());
+                auto cond = cond_br->get_operand(0);
+                auto cond_const = cast_constantint(cond);
+                auto ops = cond_br->get_operands();
+                if(cond_const) {
+                    BasicBlock* succ_bb;
+                    if(cond_const->get_value() == 1){
+                        succ_bb = static_cast<BasicBlock*>(cond_br->get_operand(2));
+                    }
+                    else succ_bb = static_cast<BasicBlock*>(cond_br->get_operand(1));
+                    for(auto &inst1 : succ_bb->get_instructions()){
+                        auto inst = &inst1;
+                        if(inst->is_phi()){
+                            for(int i = 1; i < inst->get_num_operand(); i += 2)
+                                if(inst->get_operand(i) == &bb) {
+                                    inst->remove_operand(i - 1);
+                                    inst->remove_operand(i - 1);
+                                }
+                        }
+                    }
+                    bb.erase_instr(cond_br);
+                    if(cond_const->get_value() == 1) {
+                        builder->create_br(static_cast<BasicBlock*>(ops[1]));
+                    } else {
+                        builder->create_br(static_cast<BasicBlock*>(ops[2]));
+                    }
+                    delete_bb.push_back(&bb);
+                }
+            }
         }
         for (auto bb : delete_bb) {
-            // delete unuseful basic block
-            // func.remove(bb);
             clear_blocks_recs(bb);
         }
         delete_bb.clear();
@@ -171,7 +265,8 @@ void ConstPropagation::run() {
 
 bool ConstPropagation::is_entry(BasicBlock *bb) {
     // TODO
-    throw std::runtime_error("Lab2: 你有一个TODO需要完成！");
+    if(bb == bb->get_parent()->get_entry_block())
+        return true;
     return false;
 }
 
@@ -186,6 +281,7 @@ void ConstPropagation::clear_blocks_recs(BasicBlock *start_bb) {
             func->remove(start_bb);
             auto succ_bb = start_bb->get_succ_basic_blocks();
             for (auto each_succ_bb : succ_bb) {
+                std::vector<Instruction*> del_inst;
                 for (auto &instr1 : each_succ_bb->get_instructions()) {
                     auto instr = &instr1;
                     if (instr->is_phi()) {
@@ -204,11 +300,12 @@ void ConstPropagation::clear_blocks_recs(BasicBlock *start_bb) {
                         int operands_num_phi = instr->get_num_operand();
                         if (operands_num_phi == 2) {
                             auto value = instr->get_operand(0);
-                            instr->replace_all_use_with(value);
-                            each_succ_bb->remove_instr(instr);
+                            instr->replace_all_use_with(cast_constantint(value));
+                            del_inst.push_back(instr);
                         }
                     }
                 }
+                for(auto instr : del_inst) each_succ_bb->erase_instr(instr);
                 clear_blocks_recs(each_succ_bb);
             }
         }

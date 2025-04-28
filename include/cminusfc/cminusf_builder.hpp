@@ -24,12 +24,12 @@ class Scope {
     // push a name to scope
     // return true if successful
     // return false if this name already exits
-    bool push(const std::string& name, Value *val) {
+    bool push(const std::string &name, Value *val) {
         auto result = inner[inner.size() - 1].insert({name, val});
         return result.second;
     }
 
-    Value *find(const std::string& name) {
+    Value *find(const std::string &name) {
         for (auto s = inner.rbegin(); s != inner.rend(); s++) {
             auto iter = s->find(name);
             if (iter != s->end()) {
@@ -62,11 +62,13 @@ class CminusfBuilder : public ASTVisitor {
         std::vector<Type *> output_params;
         output_params.push_back(TyInt32);
         auto *output_type = FunctionType::get(TyVoid, output_params);
-        auto *output_fun = Function::create(output_type, "output", module.get());
+        auto *output_fun =
+            Function::create(output_type, "output", module.get());
 
         std::vector<Type *> output_float_params;
         output_float_params.push_back(TyFloat);
-        auto *output_float_type = FunctionType::get(TyVoid, output_float_params);
+        auto *output_float_type =
+            FunctionType::get(TyVoid, output_float_params);
         auto *output_float_fun =
             Function::create(output_float_type, "outputFloat", module.get());
 
