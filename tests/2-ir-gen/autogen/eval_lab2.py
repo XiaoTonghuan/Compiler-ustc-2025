@@ -96,10 +96,9 @@ lv2 = {
 
 # 11
 lv3 = {
-    "complex1": (3, False),
+    "complex1": (4, True),
     "complex2": (3, True),
-    "complex3": (2, True),
-    "complex4": (3, False),
+    "complex3": (4, False),
 }
 
 suite = [
