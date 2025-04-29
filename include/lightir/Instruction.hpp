@@ -201,20 +201,23 @@ class FCmpInst : public BaseInst<FCmpInst> {
 class CallInst : public BaseInst<CallInst> {
     friend BaseInst<CallInst>;
 
-  protected:
+//   protected:
+public:
     CallInst(Function *func, std::vector<Value *> args, BasicBlock *bb);
 
-  public:
     static CallInst *create_call(Function *func, std::vector<Value *> args,
                                  BasicBlock *bb);
     FunctionType *get_function_type() const;
 
     virtual std::string print() override;
+    Function *func_;
     Instruction *clone(BasicBlock *prt) const override {
+            if(get_operands().size() == 1){
+                return new CallInst(func_, {}, prt);
+            }
         return new CallInst(
             func_, {get_operands().begin() + 1, get_operands().end()}, prt);
     }
-    Function *func_;
 };
 
 class BranchInst : public BaseInst<BranchInst> {
