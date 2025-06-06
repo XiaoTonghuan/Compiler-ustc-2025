@@ -1,5 +1,7 @@
 #include "DeadCode.hpp"
+#include "Instruction.hpp"
 #include "logging.hpp"
+#include <memory>
 #include <vector>
 
 // 处理流程：两趟处理，mark 标记有用变量，sweep 删除无用指令
@@ -38,8 +40,27 @@ bool DeadCode::clear_basic_blocks(Function *func) {
 void DeadCode::mark(Function *func) {
     work_list.clear();
     marked.clear();
-    // TODO: 标记无用变量
-    throw std::runtime_error("Lab2: 你有一个TODO需要完成！");
+    int func_num = func->get_num_basic_blocks(); 
+    // 1. 找到所有关键指令作为“活代码”的起点
+    for (auto &bb : func->get_basic_blocks()) {
+        for (auto &ins : bb.get_instructions()) {
+            if (is_critical(&ins)) {
+                if (!marked[&ins]) {
+                    marked[&ins] = true;
+                    work_list.push_back(&ins);
+                }
+            }
+        }
+    }
+
+    // 2. 使用工作列表算法，传播“活”属性
+    while (!work_list.empty()) {
+        auto ins = work_list.front();
+        work_list.pop_front();
+        // 调用辅助函数来标记其操作数
+        mark(ins);
+    }
+    
 }
 
 void DeadCode::mark(Instruction *ins) {
@@ -65,7 +86,22 @@ bool DeadCode::sweep(Function *func) {
     // 4. 注意：删除指令时，需要先删除操作数的引用，然后再删除指令本身
     // 5. 删除指令时，需要注意指令的顺序，不能删除正在遍历的指令
     std::unordered_set<Instruction *> wait_del{};
-    throw std::runtime_error("Lab2: 你有一个TODO需要完成！");
+
+    // 1. 收集所有未被标记的指令
+    for (auto &bb : func->get_basic_blocks()) {
+        for (auto &ins : bb.get_instructions()) {
+            if (!marked[&ins]) {
+                wait_del.insert(&ins);
+            }
+        }
+    }
+
+    // 2. 执行删除
+    for (auto ins : wait_del) {
+        ins->get_parent()->erase_instr(ins); // 从基本块中删除指令
+        ins_count++;
+    }
+    
     return not wait_del.empty(); // changed
 }
 
@@ -76,7 +112,31 @@ bool DeadCode::is_critical(Instruction *ins) {
     // 2. 如果是无用的分支指令，则无用
     // 3. 如果是无用的返回指令，则无用
     // 4. 如果是无用的存储指令，则无用
-    throw std::runtime_error("Lab2: 你有一个TODO需要完成！");
+    if (ins->isTerminator()) {
+        return true;
+    }
+    
+    // 2. store 指令修改内存，是关键的
+    if (ins->is_store()) {
+        // 获取 store 指令的目标地址操作数（通常是第二个操作数）
+        auto ptr_operand = ins->get_operand(1); // 假设 store 的格式是 store value, pointer
+
+        // 如果写入的是全局变量或函数参数，则认为它有副作用，是关键指令
+        if (dynamic_cast<GlobalVariable*>(ptr_operand) || dynamic_cast<Argument*>(ptr_operand)) {
+            return true;
+        }
+        
+        // 否则，它只是写入一个局部变量（例如由 alloca 创建），
+        // 它本身不是关键指令。它的死活将由后续的 load 指令决定。
+        return false;
+    }
+
+    // 3. call 指令可能有副作用（如IO），通常视为关键的
+    if (auto func_call = dynamic_cast<CallInst*>(ins)) {
+        return this->func_info->is_pure_function(func_call->get_function());
+    }
+    
+    // 其他指令（如 add, sub, mul 等纯计算指令）默认不是关键的
     return false;
 }
 

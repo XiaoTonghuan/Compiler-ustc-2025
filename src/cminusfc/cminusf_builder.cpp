@@ -191,7 +191,8 @@ Value* CminusfBuilder::visit(ASTFunDeclaration &node) {
     auto func = Function::create(fun_type, node.id, module.get());
     scope.push(node.id, func);
     context.func = func;
-    auto funBB = BasicBlock::create(module.get(), "entry", func);
+    auto funBB = BasicBlock::create(module.get(), "entry", context.func);
+    
     builder->set_insert_point(funBB);
     scope.enter();
     context.pre_enter_scope = true;
