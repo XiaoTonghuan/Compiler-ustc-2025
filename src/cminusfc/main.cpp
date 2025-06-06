@@ -63,6 +63,7 @@ int main(int argc, char **argv) {
         PassManager PM(m.get());
         // optimization 
         if(config.dce) {
+            PM.add_pass<Mem2Reg>();
             PM.add_pass<DeadCode>();
         }
 

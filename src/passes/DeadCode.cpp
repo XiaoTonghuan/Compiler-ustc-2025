@@ -118,22 +118,25 @@ bool DeadCode::is_critical(Instruction *ins) {
     
     // 2. store 指令修改内存，是关键的
     if (ins->is_store()) {
-        // 获取 store 指令的目标地址操作数（通常是第二个操作数）
-        auto ptr_operand = ins->get_operand(1); // 假设 store 的格式是 store value, pointer
-
-        // 如果写入的是全局变量或函数参数，则认为它有副作用，是关键指令
-        if (dynamic_cast<GlobalVariable*>(ptr_operand) || dynamic_cast<Argument*>(ptr_operand)) {
-            return true;
-        }
-        
-        // 否则，它只是写入一个局部变量（例如由 alloca 创建），
-        // 它本身不是关键指令。它的死活将由后续的 load 指令决定。
-        return false;
+        return true;
     }
+    // if (ins->is_store()) {
+    //     // 获取 store 指令的目标地址操作数（通常是第二个操作数）
+    //     auto ptr_operand = ins->get_operand(1); // 假设 store 的格式是 store value, pointer
+
+    //     // 如果写入的是全局变量或函数参数，则认为它有副作用，是关键指令
+    //     if (dynamic_cast<GlobalVariable*>(ptr_operand) || dynamic_cast<Argument*>(ptr_operand)) {
+    //         return true;
+    //     }
+        
+    //     // 否则，它只是写入一个局部变量（例如由 alloca 创建），
+    //     // 它本身不是关键指令。它的死活将由后续的 load 指令决定。
+    //     return false;
+    // }
 
     // 3. call 指令可能有副作用（如IO），通常视为关键的
     if (auto func_call = dynamic_cast<CallInst*>(ins)) {
-        return this->func_info->is_pure_function(func_call->get_function());
+        return not this->func_info->is_pure_function(func_call->get_function());
     }
     
     // 其他指令（如 add, sub, mul 等纯计算指令）默认不是关键的
